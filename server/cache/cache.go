@@ -3,7 +3,7 @@ package cache
 import "io"
 
 type Cache interface {
-	Get(path string, w io.Writer) (bool, error)
+	Get(path string, w io.Writer) error
 	Put(path string, r io.Reader) error
 
 	// ?
