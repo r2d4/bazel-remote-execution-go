@@ -5,6 +5,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/golang/protobuf/ptypes"
+	"github.com/r2d4/bazel-remote-execution-go/server/cache"
 	pb "google.golang.org/genproto/googleapis/devtools/remoteexecution/v1test"
 	"google.golang.org/genproto/googleapis/longrunning"
 	"google.golang.org/grpc"
@@ -12,6 +13,7 @@ import (
 )
 
 type ExecutionSrv struct {
+	Cache cache.Cache
 }
 
 // Execute implements remote_execution.Execute
@@ -25,6 +27,9 @@ func (s *ExecutionSrv) Execute(ctx context.Context, in *pb.ExecuteRequest) (*lon
 	if err != nil {
 		return nil, grpc.Errorf(codes.Internal, "marshalling ExecuteOperationMetadata to protobuf.Any %s", err)
 	}
+
+	//TODO(r2d4): implement exection
+
 	return &longrunning.Operation{
 		Metadata: m,
 	}, nil

@@ -10,7 +10,7 @@ type WatchSrv struct {
 
 func (s *WatchSrv) Watch(stream *watcher.Request, w watcher.Watcher_WatchServer) error {
 	for {
-		// Send finish message!
+		// todo implement watch
 	}
 	return nil
 }
