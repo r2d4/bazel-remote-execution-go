@@ -1,11 +1,14 @@
 package cache
 
-import "io"
+import (
+	"io"
+
+	pb "google.golang.org/genproto/googleapis/devtools/remoteexecution/v1test"
+)
 
 type Cache interface {
-	Get(path string, w io.Writer) error
-	Put(path string, r io.Reader) error
-
+	Get(*pb.Digest, io.Writer) error
+	Put(*pb.Digest, io.Reader) error
 	// ?
-	Contains(path string) (bool, error)
+	Contains(*pb.Digest) (bool, error)
 }

@@ -1,8 +1,8 @@
 package bytestream
 
 import (
-	"fmt"
 	"io"
+	"strings"
 
 	"github.com/Sirupsen/logrus"
 
@@ -46,14 +46,17 @@ type ByteStreamSrv struct {
 	writeHandler WriteHandler
 	status       syncmap.Map
 
+	digestMap syncmap.Map
+
 	AllowOverwrite bool
 }
 
 func NewByteStreamSrv(r ReadHandler, w WriteHandler) *ByteStreamSrv {
 	return &ByteStreamSrv{
-		readHandler:  r,
-		writeHandler: w,
-		status:       syncmap.Map{},
+		readHandler:    r,
+		writeHandler:   w,
+		status:         syncmap.Map{},
+		AllowOverwrite: true,
 	}
 }
 
@@ -132,6 +135,15 @@ func (b *ByteStreamSrv) Write(stream bytestream.ByteStream_WriteServer) error {
 		if b.writeHandler == nil {
 			return grpc.Errorf(codes.Unimplemented, "instance of NewServer(writeHandler = nil) rejects all writes")
 		}
+
+		// I'm not sure how we're supposed to infer the random uuid set by the client
+		// so this removes it :shrug:
+		// uploads/%s/blobs/%s/%d
+		// -->
+		// blobs/%s/%d
+		r := strings.Split(writeReq.ResourceName, "/")
+		writeReq.ResourceName = strings.Join(r[2:], "/")
+		logrus.Infof("[BYTESTREAM] [WRITE] %s", writeReq.ResourceName)
 		var status *bytestream.QueryWriteStatusResponse
 		s, ok := b.status.Load(writeReq.ResourceName)
 		if !ok {
@@ -146,7 +158,7 @@ func (b *ByteStreamSrv) Write(stream bytestream.ByteStream_WriteServer) error {
 		} else {
 			status, ok := s.(*bytestream.QueryWriteStatusResponse)
 			if !ok {
-				return fmt.Errorf("writing")
+				return grpc.Errorf(codes.Internal, "type check failed")
 			}
 			// writeReq.ResourceName has already been seen by this server.
 			if status.Complete {
@@ -159,23 +171,26 @@ func (b *ByteStreamSrv) Write(stream bytestream.ByteStream_WriteServer) error {
 				status.CommittedSize = writeReq.WriteOffset
 			}
 		}
+		logrus.Infoln("writeReq:", writeReq)
+		logrus.Infoln("status:", status)
+
 		if writeReq.WriteOffset != status.CommittedSize {
 			return grpc.Errorf(codes.FailedPrecondition, "%q write_offset=%d differs from server internal committed_size=%d",
 				writeReq.ResourceName, writeReq.WriteOffset, status.CommittedSize)
 		}
 
-		// WriteRequest with empty data is ok.
-		if len(writeReq.Data) != 0 {
-			writer, err := b.writeHandler.GetWriter(stream.Context(), writeReq.ResourceName, status.CommittedSize)
-			if err != nil {
-				return grpc.Errorf(codes.Internal, "GetWriter(%q): %v", writeReq.ResourceName, err)
-			}
-			wroteLen, err := writer.Write(writeReq.Data)
-			if err != nil {
-				return grpc.Errorf(codes.Internal, "Write(%q): %v", writeReq.ResourceName, err)
-			}
-			status.CommittedSize += int64(wroteLen)
+		// // WriteRequest with empty data is ok.
+		// if len(writeReq.Data) != 0 {
+		writer, err := b.writeHandler.GetWriter(stream.Context(), writeReq.ResourceName, status.CommittedSize)
+		if err != nil {
+			return grpc.Errorf(codes.Internal, "GetWriter(%q): %v", writeReq.ResourceName, err)
 		}
+		wroteLen, err := writer.Write(writeReq.Data)
+		if err != nil {
+			return grpc.Errorf(codes.Internal, "Write(%q): %v", writeReq.ResourceName, err)
+		}
+		status.CommittedSize += int64(wroteLen)
+		// }
 
 		if writeReq.FinishWrite {
 			r := &bytestream.WriteResponse{CommittedSize: status.CommittedSize}
@@ -184,14 +199,15 @@ func (b *ByteStreamSrv) Write(stream bytestream.ByteStream_WriteServer) error {
 				return grpc.Errorf(codes.Internal, "stream.SendAndClose(%q, WriteResponse{ %d }): %v", writeReq.ResourceName, status.CommittedSize, err)
 			}
 			status.Complete = true
-			if status.CommittedSize == 0 {
-				logrus.Warnf("write handler close 0 bytes written: %s", writeReq)
-				return nil
-				return grpc.Errorf(codes.FailedPrecondition, "writeHandler.Close(%q): 0 bytes written", writeReq.ResourceName)
-			}
+			// if status.CommittedSize == 0 {
+			// 	logrus.Warnf("write handler close 0 bytes written: %s", writeReq)
+			// 	return nil
+			// 	return grpc.Errorf(codes.FailedPrecondition, "writeHandler.Close(%q): 0 bytes written", writeReq.ResourceName)
+			// }
 			if err = b.writeHandler.Close(stream.Context(), writeReq.ResourceName); err != nil {
 				return grpc.Errorf(codes.Internal, "writeHandler.Close(%q): %v", writeReq.ResourceName, err)
 			}
+			logrus.Infoln("Finished write for %s", writeReq.ResourceName)
 		}
 	}
 }

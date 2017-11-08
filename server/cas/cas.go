@@ -2,7 +2,6 @@ package cas
 
 import (
 	"bytes"
-	"fmt"
 
 	"golang.org/x/net/context"
 
@@ -30,8 +29,7 @@ func (s *CASSrv) FindMissingBlobs(ctx context.Context, in *pb.FindMissingBlobsRe
 	for _, req := range in.BlobDigests {
 		req := req
 		g.Go(func() error {
-			digest := fmt.Sprintf("bazel-cache/cas/%s", req.Hash)
-			contains, err := s.Cache.Contains(digest)
+			contains, err := s.Cache.Contains(req)
 			if err != nil {
 				logrus.Info("error %s", err)
 				return err
@@ -69,7 +67,7 @@ func (s *CASSrv) BatchUpdateBlobs(ctx context.Context, in *pb.BatchUpdateBlobsRe
 		req := req
 		g.Go(func() error {
 			b := bytes.NewBuffer(req.Data)
-			if err := s.Cache.Put(fmt.Sprintf("bazel-cache/cas/%s", req.ContentDigest.Hash), b); err != nil {
+			if err := s.Cache.Put(req.ContentDigest, b); err != nil {
 				return err
 			}
 			any, err := ptypes.MarshalAny(req)

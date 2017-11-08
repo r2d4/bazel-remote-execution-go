@@ -11,6 +11,8 @@ import (
 
 	"cloud.google.com/go/storage"
 	"github.com/Sirupsen/logrus"
+
+	pb "google.golang.org/genproto/googleapis/devtools/remoteexecution/v1test"
 )
 
 func NewGCSCache(bucketName string) (*GCS_Cache, error) {
@@ -36,7 +38,16 @@ type GCS_Cache struct {
 	rws syncmap.Map
 }
 
-func (g *GCS_Cache) Get(path string, w io.Writer) error {
+func (g *GCS_Cache) path(in *pb.Digest) string {
+	return fmt.Sprintf("blobs/%s/%d", in.Hash, in.SizeBytes)
+}
+
+func (g *GCS_Cache) Get(in *pb.Digest, w io.Writer) error {
+	path := g.path(in)
+	return g.get(path, w)
+}
+
+func (g *GCS_Cache) get(path string, w io.Writer) error {
 	logrus.Infof("[CACHE] [GET] %s", path)
 	obj := g.bkt.Object(path)
 	r, err := obj.NewReader(g.ctx)
@@ -51,7 +62,8 @@ func (g *GCS_Cache) Get(path string, w io.Writer) error {
 	return nil
 }
 
-func (g *GCS_Cache) Contains(path string) (bool, error) {
+func (g *GCS_Cache) Contains(in *pb.Digest) (bool, error) {
+	path := g.path(in)
 	logrus.Infof("[CACHE] [CONTAINS] %s", path)
 	obj := g.bkt.Object(path)
 	r, err := obj.NewReader(g.ctx)
@@ -67,7 +79,12 @@ func (g *GCS_Cache) Contains(path string) (bool, error) {
 	return true, nil
 }
 
-func (g *GCS_Cache) Put(path string, r io.Reader) error {
+func (g *GCS_Cache) Put(in *pb.Digest, r io.Reader) error {
+	path := g.path(in)
+	return g.put(path, r)
+}
+
+func (g *GCS_Cache) put(path string, r io.Reader) error {
 	logrus.Infof("[CACHE] [PUT] %s", path)
 	obj := g.bkt.Object(path)
 
@@ -112,7 +129,7 @@ func (g *GCS_Cache) Close(ctx context.Context, path string) error {
 	}
 
 	r := rws.NewReader()
-	if err := g.Put(path, r); err != nil {
+	if err := g.put(path, r); err != nil {
 		return err
 	}
 

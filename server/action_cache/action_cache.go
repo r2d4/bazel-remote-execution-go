@@ -3,7 +3,6 @@ package action_cache
 import (
 	"bytes"
 	"encoding/gob"
-	"fmt"
 
 	"golang.org/x/net/context"
 
@@ -25,7 +24,7 @@ type ActionCacheSrv struct {
 func (s *ActionCacheSrv) GetActionResult(ctx context.Context, in *pb.GetActionResultRequest) (*pb.ActionResult, error) {
 	logrus.Infof("[GetActionResult] %+v", in)
 	var b bytes.Buffer
-	err := s.Cache.Get(fmt.Sprintf("bazel-cache/ac/%s", in.ActionDigest.Hash), &b)
+	err := s.Cache.Get(in.ActionDigest, &b)
 	if err == storage.ErrObjectNotExist {
 		return nil, grpc.Errorf(codes.NotFound, "")
 	}
@@ -48,7 +47,7 @@ func (s *ActionCacheSrv) UpdateActionResult(ctx context.Context, in *pb.UpdateAc
 	if err := enc.Encode(in.ActionResult); err != nil {
 		return nil, grpc.Errorf(codes.Internal, "%v", err)
 	}
-	if err := s.Cache.Put(fmt.Sprintf("bazel-cache/ac/%s", in.ActionDigest.Hash), &b); err != nil {
+	if err := s.Cache.Put(in.ActionDigest, &b); err != nil {
 		return nil, grpc.Errorf(codes.Internal, "%v", err)
 	}
 	return nil, grpc.Errorf(codes.NotFound, "")

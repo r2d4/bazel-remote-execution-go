@@ -56,7 +56,9 @@ func NewServer() (*srv, error) {
 			Cache:   cache,
 			CASChan: casChan,
 		},
-		ExecutionSrv: execution.ExecutionSrv{},
+		ExecutionSrv: execution.ExecutionSrv{
+			Cache: cache,
+		},
 		WatchSrv: watch.WatchSrv{
 			ActionChan: acChan,
 			CASChan:    casChan,
