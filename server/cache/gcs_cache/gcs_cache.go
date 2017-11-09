@@ -11,6 +11,7 @@ import (
 
 	"cloud.google.com/go/storage"
 	"github.com/Sirupsen/logrus"
+	"github.com/r2d4/bazel-remote-execution-go/server/cache"
 
 	pb "google.golang.org/genproto/googleapis/devtools/remoteexecution/v1test"
 )
@@ -81,6 +82,15 @@ func (g *GCS_Cache) Contains(in *pb.Digest) (bool, error) {
 
 func (g *GCS_Cache) Put(in *pb.Digest, r io.Reader) error {
 	path := g.path(in)
+	return g.put(path, r)
+}
+
+func (g *GCS_Cache) Upload(in cache.Digestable, r io.Reader) error {
+	digest := &pb.Digest{
+		SizeBytes: in.GetSizeBytes(),
+		Hash:      in.GetHash(),
+	}
+	path := g.path(digest)
 	return g.put(path, r)
 }
 

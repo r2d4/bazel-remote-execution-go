@@ -199,11 +199,6 @@ func (b *ByteStreamSrv) Write(stream bytestream.ByteStream_WriteServer) error {
 				return grpc.Errorf(codes.Internal, "stream.SendAndClose(%q, WriteResponse{ %d }): %v", writeReq.ResourceName, status.CommittedSize, err)
 			}
 			status.Complete = true
-			// if status.CommittedSize == 0 {
-			// 	logrus.Warnf("write handler close 0 bytes written: %s", writeReq)
-			// 	return nil
-			// 	return grpc.Errorf(codes.FailedPrecondition, "writeHandler.Close(%q): 0 bytes written", writeReq.ResourceName)
-			// }
 			if err = b.writeHandler.Close(stream.Context(), writeReq.ResourceName); err != nil {
 				return grpc.Errorf(codes.Internal, "writeHandler.Close(%q): %v", writeReq.ResourceName, err)
 			}
